@@ -13,7 +13,7 @@ from abc import ABC, abstractmethod
 
 import warnings
 
-from utils import JsonIO
+from .utils import JsonIO
 from functools import reduce
 
 DATA_TYPE = TypeVar("DATA_TYPE")

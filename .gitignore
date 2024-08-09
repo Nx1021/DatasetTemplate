@@ -9,6 +9,10 @@ weights/
 *.pt
 *.npy
 *.npz
+test*.py
 __pycache__/
 DatasetTemplate.egg-info/
 build/
+root/
+scenes_cfg/
+datasettest/

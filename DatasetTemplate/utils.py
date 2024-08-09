@@ -49,6 +49,36 @@ def read_text(file_path):
         text = file.read()
         return text
 
+def write_xml(file_path, data_dict):
+    try:
+        import dicttoxml
+    except ImportError:
+        import pip
+        pip.main(['install', 'dicttoxml'])
+        import importlib
+        dicttoxml = importlib.import_module('dicttoxml')  # 安装后重新导入
+        
+    # 将字典转换为 XML
+    xml_bytes = dicttoxml(data_dict, custom_root='root', attr_type=False)
+
+    # 写入 XML 文件
+    with open(file_path, 'wb') as file:
+        file.write(xml_bytes)
+
+def read_xml(file_path):
+    try:
+        import xmltodict
+    except ImportError:
+        import pip
+        pip.main(['install', 'xmltodict'])
+        import importlib
+        xmltodict = importlib.import_module('xmltodict')  # 安装后重新导入
+
+    # 读取 XML 文件
+    with open(file_path, 'rb') as file:
+        xml_dict = xmltodict.parse(file)
+        return xml_dict    
+
 def __cvt_set_type(seq, type_:type):
     if issubclass(type_, str):
         seq = "".join(seq)

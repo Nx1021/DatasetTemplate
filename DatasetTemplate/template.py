@@ -1,5 +1,5 @@
 from ._base import DataFile, DataCluster, Dataset, DatasetView, DataFile_ListLike
-from .utils import read_text, write_text, JsonIO, read_xml, write_xml
+from .utils import read_text, write_text, JsonIO, load_xml, dump_xml
 from typing import List, Tuple, Dict, Any, Union, Callable, Optional, TypedDict, Literal
 
 class NdarrayNpyCluster(DataCluster):
@@ -57,7 +57,7 @@ class JsonCluster(DataCluster):
 
 class XmlCluster(DataCluster):
     def __init__(self, path_generator:Callable[[int], str]) -> None:
-        super().__init__(path_generator, read_xml, write_xml)
+        super().__init__(path_generator, load_xml, dump_xml)
 
 
 class JsonFile(DataFile):
@@ -66,7 +66,7 @@ class JsonFile(DataFile):
 
 class XmlFile(DataFile):
     def __init__(self, file_path:str) -> None:
-        super().__init__(file_path, read_xml, write_xml)
+        super().__init__(file_path, load_xml, dump_xml)
 
 class NdarrayNpyFile(DataFile_ListLike):
     def __init__(self, file_path:str) -> None:

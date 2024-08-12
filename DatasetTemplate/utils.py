@@ -49,7 +49,7 @@ def read_text(file_path):
         text = file.read()
         return text
 
-def write_xml(file_path, data_dict):
+def dump_xml(file_path, data_dict):
     try:
         import dicttoxml
     except ImportError:
@@ -65,7 +65,7 @@ def write_xml(file_path, data_dict):
     with open(file_path, 'wb') as file:
         file.write(xml_bytes)
 
-def read_xml(file_path):
+def load_xml(file_path):
     try:
         import xmltodict
     except ImportError:
@@ -78,6 +78,58 @@ def read_xml(file_path):
     with open(file_path, 'rb') as file:
         xml_dict = xmltodict.parse(file)
         return xml_dict    
+    
+def load_yaml_with_format(file_path):
+    try:
+        import ruamel.yaml as ry
+    except ImportError:
+        import pip
+        pip.main(['install', 'ruamel.yaml'])
+        import importlib
+        ry = importlib.import_module('ruamel.yaml')  # 安装后重新导入
+    
+    # 读取 YAML 文件
+    with open(file_path, 'r') as file:
+        yaml = ry.YAML()
+        return yaml.load(file)
+    
+def dump_yaml_with_format(file_path, data):
+    try:
+        import ruamel.yaml as ry
+    except ImportError:
+        import pip
+        pip.main(['install', 'ruamel.yaml'])
+        import importlib
+        ry = importlib.import_module('ruamel.yaml')  # 安装后重新导入
+    
+    with open(file_path, 'w') as file:
+        yaml = ry.YAML()
+        yaml.dump(data, file)
+
+def load_yaml(file_path):
+    try:
+        import yaml
+    except ImportError:
+        import pip
+        pip.main(['install', 'pyyaml'])
+        import importlib
+        yaml = importlib.import_module('yaml')
+    
+    # 读取 YAML 文件
+    with open(file_path, 'r') as file:
+        return yaml.load(file, Loader=yaml.FullLoader)
+
+def dump_yaml(file_path, data):
+    try:
+        import yaml
+    except ImportError:
+        import pip
+        pip.main(['install', 'pyyaml'])
+        import importlib
+        yaml = importlib.import_module('yaml')
+    
+    with open(file_path, 'w') as file:
+        yaml.dump(data, file)
 
 def __cvt_set_type(seq, type_:type):
     if issubclass(type_, str):
@@ -1190,3 +1242,141 @@ def rebind_methods(obj, method_name:Union[str, Callable], new_func:Callable):
         assert hasattr(obj, method_name), f"method {method_name} not found"
     assert isinstance(method_name, str), f"method {method_name} not found"
     setattr(obj, method_name, types.MethodType(new_func, obj))
+
+def parse_TypedDict(input_dict: dict, name: str = "MyTypedDict", output_file:Optional[str] = None) -> str:
+    """
+    Brief
+    -----
+    Generate a TypedDict class from a `dict`.
+
+    Parameters
+    ----------
+    input_dict : dict
+        The dictionary to generate the TypedDict from.
+    name : str, optional
+        The name of the TypedDict class, by default "MyTypedDict".
+    output_file : str, optional
+        The path to save the TypedDict class to, by default None.
+    
+    Returns
+    -------
+    str
+        The generated TypedDict class as a string
+
+    Examples
+    --------
+
+    ```python
+    dict_input = {1: {"x": {0: 0, 1: 1, 2: 2}, "y": [{"aaa": 1, "bbb":2}]}}
+    print(parse_TypedDict(dict_input, "MyTypedDict", "MyTypedDict.py"))
+    # Output:
+    # from typing import TypedDict, Any
+    #
+    # MyTypedDict_item_x = dict[int, int]
+    #
+    # class MyTypedDict_item_y(TypedDict):
+    #     aaa: int
+    #     bbb: int
+    #
+    # class MyTypedDict_item(TypedDict):
+    #     x: MyTypedDict_item_X
+    #     y: list[MyTypedDict_item_Y]
+    #
+    # MyTypedDict = dict[int, MyTypedDict_item]
+
+    ```
+    """
+    imports = []
+    output_code = []
+    imports.append("from typing import TypedDict, Any")
+
+    def _check_type(value: Any) -> str:
+        python_type = type(value).__name__
+        if python_type == 'int':
+            return 'int'
+        elif python_type == 'float':
+            return 'float'
+        elif python_type == 'str':
+            return 'str'
+        elif python_type == 'bool':
+            return 'bool'
+        elif python_type == 'list':
+            return 'list[Any]'
+        elif python_type == 'dict':
+            return 'dict[str, Any]'
+        else:
+            try:
+                from numpy import ndarray
+                if isinstance(value, ndarray):
+                    imports.append("from numpy import ndarray")
+                    return 'ndarray'
+            except ImportError:
+                pass
+            try:
+                from torch import Tensor
+                if isinstance(value, Tensor):
+                    imports.append("from torch import Tensor")
+                    return 'Tensor'
+            except ImportError:
+                pass
+            return 'Any'
+
+    def generate_typeddict(input_dict: dict, class_name: str) -> str:
+        input_dict = dict(input_dict)
+        fields = []
+        allkeys = input_dict.keys()
+        if_all_key_int = all(isinstance(key, int) for key in allkeys)
+        # not allow mixed key types
+        assert all(isinstance(key, str) for key in allkeys) or if_all_key_int, "All keys must be either str or int"
+        if if_all_key_int:
+            # if all keys are int, use int as key type
+            value = list(input_dict.values())[0] # get the first value. all values are regarded to have the same type.
+            if isinstance(value, dict):
+                fields.append(f"{class_name} = dict[int, {class_name}_item]")
+                output_code.append(generate_typeddict(value, f"{class_name}_item"))
+            elif isinstance(value, (list, tuple, set)):
+                iterable_type = type(value).__name__
+                if len(value) > 0:
+                    if isinstance(value[0], dict):
+                        fields.append(f"{class_name} = dict[int, {iterable_type}[{class_name}_item]]")
+                        output_code.append(generate_typeddict(value[0], f"{class_name}_item"))
+                    else:
+                        fields.append(f"{class_name} = dict[int, {iterable_type}[{_check_type(value[0])}]")
+                else:
+                    fields.append(f"{class_name} = dict[int, {iterable_type}]")
+            else:
+                fields.append(f"{class_name} = dict[int, {_check_type(value)}]")
+        else:
+            fields.append(f"class {class_name}(TypedDict):")
+            for key, value in input_dict.items():
+                if isinstance(value, dict):
+                    sub_dict_name = f"{class_name}_{key}"
+                    fields.append(f'    {key}: {sub_dict_name}')
+                    output_code.append(generate_typeddict(value, sub_dict_name))
+                elif isinstance(value, (list, tuple, set)):
+                    iterable_type = type(value).__name__
+                    if len(value) > 0:
+                        if isinstance(value[0], dict):
+                            sub_dict_name = f"{class_name}_{key}"
+                            fields.append(f'    {key}: {iterable_type}[{sub_dict_name}]')
+                            output_code.append(generate_typeddict(value[0], sub_dict_name))
+                        else:
+                            fields.append(f'    {key}: {iterable_type}[{_check_type(value[0])}]')
+                    else:
+                        fields.append(f'    {key}: {iterable_type}')
+                else:
+                    fields.append(f'    {key}: {_check_type(value)}')
+
+        return "\n".join(fields) + "\n"
+
+    output_code.append(generate_typeddict(input_dict, name))
+    
+    string = "\n".join(output_code)
+    imports = list(set(imports))
+    string = "\n".join(imports) + '\n\n' + string
+
+    if output_file:
+        with open(output_file, "w") as f:
+            f.write(string)
+
+    return string

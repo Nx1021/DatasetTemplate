@@ -25,6 +25,7 @@ warnings.formatwarning = custom_warning_format
 DEBUG = False
 
 DATA_TYPE = TypeVar("DATA_TYPE")
+APD_IDX_TYPE = TypeVar("APD_IDX_TYPE")
 _T = TypeVar("_T")
 
 def inherit_private(child:type, parent:type, name):
@@ -71,6 +72,11 @@ class O_Mode(Enum):
     IMIDIATE = 1
     EXIT     = 2
     MANUAL   = 4
+
+class DatasetIOMode(Enum):
+    MODE_READ = 1
+    MODE_APPEND = 2
+    MODE_WRITE = 4
 
 class _DecoratingAfterInit(ABCMeta, type):
     __is_decorating = False
@@ -635,7 +641,6 @@ class DataCluster(_SingleData[DATA_TYPE], Generic[DATA_TYPE]):
     def is_ready(self):
         return super().is_ready() and isinstance(self.path_generator, Callable)
     
-APD_IDX_TYPE = TypeVar("APD_IDX_TYPE")
 class _DataCluster_MultiToOne(_SingleData[DATA_TYPE], Generic[DATA_TYPE, APD_IDX_TYPE]):
     """
     a variant of DataCluster, which is used to store one data in multiple files
@@ -1087,11 +1092,6 @@ class _RequirementError(ValueError):
 
 class _IdxNotFoundError(ValueError):
     pass
-
-class DatasetIOMode(Enum):
-    MODE_READ = 1
-    MODE_APPEND = 2
-    MODE_WRITE = 4
 
 class _RegisterInstance():
     """
@@ -2490,6 +2490,20 @@ class DatasetView(_DatasetBase):
     def add_dataset(self,   dataset:Union[Dataset, "DatasetView"], 
                             source_indices:Optional[Iterable[int]] = None,
                             target_indices:Optional[Iterable[int]] = None,) -> None:
+        """
+        Brief
+        -----
+        Add a dataset to the DatasetView.
+
+        Parameters
+        -----
+        dataset: Dataset|DatasetView
+            the dataset to be added.
+        source_indices: Iterable[int] | None
+            the indices of the data in the dataset. If it's None, all data in the dataset will be added.
+        target_indices: Iterable[int] | None
+            the indices of the data in the DatasetView. If it's None, the data will be added to the end of the DatasetView.
+        """
         if source_indices is None:
             source_indices = dataset.keys()
         else:
@@ -2509,13 +2523,27 @@ class DatasetView(_DatasetBase):
         for idx, source_idx in zip(target_indices, source_indices):
             self.__idx_map._set_inner(idx, {"source_name": dataset.dataset_name, "source_idx": source_idx})
 
-    def add(self, idx:int, source_name:Dataset|str, source_idx:int) -> None:
-        # TODO
+    def add(self, idx:int, source:Dataset|str, source_idx:int) -> None:
+        """
+        Brief
+        -----
+        Add a data to the DatasetView.
+
+        Parameters
+        -----
+        idx: int
+            the index of the data in the DatasetView.
+        source_name: Dataset|str
+            the dataset to be added. If it's a string, the dataset will be queried by the string. Ensure the dataset exists.
+        """
         assert isinstance(idx, int), "idx should be an int"
-        if isinstance(source_name, Dataset):
-            source_name = source_name.dataset_name
-        assert isinstance(source_name, str), "source_name should be a str"
-        self.__idx_map._set_inner(idx, {"source_name": source_name, "source_idx": source_idx})
+        if isinstance(source, Dataset):
+            source = source.dataset_name
+        elif isinstance(source, str):
+            pass
+        else:
+            raise TypeError("source_name should be a Dataset or a str")
+        self.__idx_map._set_inner(idx, {"source_name": source, "source_idx": source_idx})
 
     def select( self, 
                 include_tags:Optional[Iterable[str]|str]    = None, 
@@ -2526,7 +2554,41 @@ class DatasetView(_DatasetBase):
                 exclude_shallow_dataset_names:Optional[Iterable[str]|str]    = None,
                 include_source_dataset_names:Optional[Iterable[str]|str]    = None,
                 exclude_source_dataset_names:Optional[Iterable[str]|str]     = None) -> list[int]:
-                
+        """
+        Brief
+        -----
+        select data by tags and indices. return the selected indices.
+
+        Parameters
+        -----
+        include_tags: Iterable[str]|str|None
+            the tags to be included. If it's None, means all tags will be included.
+        exclude_tags: Iterable[str]|str|None
+            the tags to be excluded. If it's None, means no tags will be excluded. 
+            `exclude_tags` has a higher priority than `include_tags`.
+        include_indices: Iterable[int]|int|None
+            the indices to be included. If it's None, means all indices will be included.
+        exclude_indices: Iterable[int]|int|None
+            the indices to be excluded. If it's None, means no indices will be excluded.
+            `exclude_indices` has a higher priority than `include_indices`.
+        include_shallow_dataset_names: Iterable[str]|str|None
+            - shallow dataset names means the names of the datasets or datasetviews that are directly referenced by the DatasetView.
+            the shallow dataset names to be included. If it's None, means all shallow dataset names will be included.
+        exclude_shallow_dataset_names: Iterable[str]|str|None
+            the shallow dataset names to be excluded. If it's None, means no shallow dataset names will be excluded.
+            `exclude_shallow_dataset_names` has a higher priority than `include_shallow_dataset_names`.
+        include_source_dataset_names: Iterable[str]|str|None
+            - source dataset names means the names of the datasets that are rootly referenced by the DatasetView.
+            the source dataset names to be included. If it's None, means all source dataset names will be included.
+        exclude_source_dataset_names: Iterable[str]|str|None
+            the source dataset names to be excluded. If it's None, means no source dataset names will be excluded.
+            `exclude_source_dataset_names` has a higher priority than `include_source_dataset_names
+
+        Return
+        -----
+        selected_indices: list[int]
+            the selected indices.
+        """
         tags_filter    = self._select(include_tags,                     exclude_tags,                   str)
         indices_filter = self._select(include_indices,                  exclude_indices,                int)
         shallow_filter = self._select(include_shallow_dataset_names,    exclude_shallow_dataset_names,  str)
@@ -2546,6 +2608,9 @@ class DatasetView(_DatasetBase):
         return selected_indices
     
     def _get_ref_chain(self, idx:int):
+        """
+        Get the reference chain of the data by index.
+        """
         chain:list[tuple[Dataset, int]] = []
         def func(ds:Dataset|DatasetView, idx:int):
             source_name = ds.__idx_map._get_inner(idx)["source_name"]
@@ -2560,10 +2625,27 @@ class DatasetView(_DatasetBase):
         return chain
     
     def _query_source(self, idx:int) -> tuple[Dataset, int]:
+        """
+        query the source dataset and index by the index of the data.
+        """
         chain = self._get_ref_chain(idx)
         return chain[-1]
     
     def print_ref_chain(self, idx:int) -> None:
+        """
+        print the reference chain of the data by index.
+
+        Examples
+        -----
+        ```python
+
+        # datasetview = DatasetView("dataset1")
+        # ...
+        datasetview.print_ref_chain(0)
+        # output:
+        # dataset1[0] -> dataset2[0] -> dataset3[0]
+        ```
+        """
         chain = self._get_ref_chain(idx)
         string = f"{self}[{idx}] -> " + " -> ".join([f"{ds.dataset_name}[{idx}]" for ds, idx in chain])
         print(string)
@@ -2576,9 +2658,3 @@ class DatasetView(_DatasetBase):
         return new_view
 
     # endregion
-
-# class DatasetView(_DatasetView):
-#     """
-#     Read-only Dataset.
-#     """
-#     pass

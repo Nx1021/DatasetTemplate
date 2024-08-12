@@ -21,6 +21,13 @@ _KT = TypeVar('_KT')
 _VT = TypeVar('_VT')
 _ITERABLE_T = TypeVar('_ITERABLE_T', bound = Iterable)
 
+def pip_module(module_name:str, pip_name:str):
+    import pip
+    pip.main(['install', pip_name])
+    import importlib
+    m = importlib.import_module(module_name)
+    return m
+
 def extract_doc(doc:str, title:str):
     idx = doc.find(title)
     sub_doc = doc[idx:]
@@ -53,11 +60,7 @@ def dump_xml(file_path, data_dict):
     try:
         import dicttoxml
     except ImportError:
-        import pip
-        pip.main(['install', 'dicttoxml'])
-        import importlib
-        dicttoxml = importlib.import_module('dicttoxml')  # 安装后重新导入
-        
+        dicttoxml = pip_module('dicttoxml', 'dicttoxml')
     # 将字典转换为 XML
     xml_bytes = dicttoxml(data_dict, custom_root='root', attr_type=False)
 
@@ -69,10 +72,7 @@ def load_xml(file_path):
     try:
         import xmltodict
     except ImportError:
-        import pip
-        pip.main(['install', 'xmltodict'])
-        import importlib
-        xmltodict = importlib.import_module('xmltodict')  # 安装后重新导入
+        xmltodict = pip_module('xmltodict', 'xmltodict')
 
     # 读取 XML 文件
     with open(file_path, 'rb') as file:
@@ -83,10 +83,7 @@ def load_yaml_with_format(file_path):
     try:
         import ruamel.yaml as ry
     except ImportError:
-        import pip
-        pip.main(['install', 'ruamel.yaml'])
-        import importlib
-        ry = importlib.import_module('ruamel.yaml')  # 安装后重新导入
+        ry = pip_module('ruamel.yaml', 'ruamel.yaml')
     
     # 读取 YAML 文件
     with open(file_path, 'r') as file:
@@ -97,10 +94,7 @@ def dump_yaml_with_format(file_path, data):
     try:
         import ruamel.yaml as ry
     except ImportError:
-        import pip
-        pip.main(['install', 'ruamel.yaml'])
-        import importlib
-        ry = importlib.import_module('ruamel.yaml')  # 安装后重新导入
+        ry = pip_module('ruamel.yaml', 'ruamel.yaml')
     
     with open(file_path, 'w') as file:
         yaml = ry.YAML()
@@ -110,10 +104,7 @@ def load_yaml(file_path):
     try:
         import yaml
     except ImportError:
-        import pip
-        pip.main(['install', 'pyyaml'])
-        import importlib
-        yaml = importlib.import_module('yaml')
+        yaml = pip_module('yaml', 'pyyaml')
     
     # 读取 YAML 文件
     with open(file_path, 'r') as file:
@@ -123,11 +114,8 @@ def dump_yaml(file_path, data):
     try:
         import yaml
     except ImportError:
-        import pip
-        pip.main(['install', 'pyyaml'])
-        import importlib
-        yaml = importlib.import_module('yaml')
-    
+        yaml = pip_module('yaml', 'pyyaml')
+
     with open(file_path, 'w') as file:
         yaml.dump(data, file)
 

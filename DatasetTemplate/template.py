@@ -1,5 +1,5 @@
 from ._base import DataFile, DataCluster, Dataset, DatasetView, DataFile_ListLike
-from .utils import read_text, write_text, JsonIO, load_xml, dump_xml
+from .utils import read_text, write_text, JsonIO, load_xml, dump_xml, pip_module
 from typing import List, Tuple, Dict, Any, Union, Callable, Optional, TypedDict, Literal
 
 class NdarrayNpyCluster(DataCluster):
@@ -24,22 +24,34 @@ class NdarrayNpzDictCluster(DataCluster):
 
 class CvGrayImageCluster(DataCluster):
     def __init__(self, path_generator:Callable[[int], str]) -> None:
-        import cv2
+        try:
+            import cv2
+        except ImportError:
+            cv2 = pip_module("cv2", "opencv-python")
         super().__init__(path_generator, lambda x: cv2.imread(x, cv2.IMREAD_GRAYSCALE), cv2.imwrite)
 
 class CvColorImageCluster(DataCluster):
     def __init__(self, path_generator:Callable[[int], str]) -> None:
-        import cv2
+        try:
+            import cv2
+        except ImportError:
+            cv2 = pip_module("cv2", "opencv-python")
         super().__init__(path_generator, cv2.imread, cv2.imwrite)
 
 class CvColorImageWithAlphaCluster(DataCluster):
     def __init__(self, path_generator:Callable[[int], str]) -> None:
-        import cv2
+        try:
+            import cv2
+        except ImportError:
+            cv2 = pip_module("cv2", "opencv-python")
         super().__init__(path_generator, lambda x: cv2.imread(x, cv2.IMREAD_UNCHANGED), cv2.imwrite)
 
 class CvDepthImageCluster(DataCluster):
     def __init__(self, path_generator:Callable[[int], str]) -> None:
-        import cv2
+        try:
+            import cv2
+        except ImportError:
+            cv2 = pip_module("cv2", "opencv-python")
         super().__init__(path_generator, lambda x: cv2.imread(x, cv2.IMREAD_ANYDEPTH), lambda x, y: cv2.imwrite(x, y.astype('uint16')))
 
 class TxtCluster(DataCluster):
@@ -48,7 +60,11 @@ class TxtCluster(DataCluster):
 
 class MatCluster(DataCluster):
     def __init__(self, path_generator:Callable[[int], str]) -> None:
-        from scipy.io import loadmat, savemat
+        try:
+            from scipy.io import loadmat, savemat
+        except ImportError:
+            scipy = pip_module("scipy", "scipy")
+            from scipy.io import loadmat, savemat
         super().__init__(path_generator, loadmat, savemat)
 
 class JsonCluster(DataCluster):
